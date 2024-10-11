@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <!-- Meta Tags and Title -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Responsive Property Listing with Mapbox</title>
+
+    <!-- Mapbox CSS -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.13.0/mapbox-gl.css" rel="stylesheet" />
+
+    <!-- Mapbox Geocoder CSS -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css"
+        rel="stylesheet" />
+
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <!-- Custom CSS -->
+    <style>
+        /* Base Styles */
+        body,
+        html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        /* Container */
+        .container {
+            display: flex;
+            height: 100%;
+            flex-direction: column;
+        }
+
+        /* Search Container */
+        .search-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 15px 20px;
+            z-index: 1000;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        #geocoder {
+            flex: 1 1 300px;
+            min-width: 200px;
+            margin-bottom: 10px;
+        }
+
+        .search-container select {
+            margin-right: 10px;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            flex: 1 1 100px;
+            min-width: 100px;
+        }
+
+        .search-container button {
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            background-color: #007bff;
+            border: none;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .mapboxgl-ctrl-geocoder {
+            width: 100%;
+            position: relative;
+        }
+
+        .mapboxgl-ctrl-geocoder--icon {
+            width: 24px;
+            height: 24px;
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .mapboxgl-ctrl-geocoder--input {
+            padding-left: 40px;
+        }
+
+        /* Map and Listing */
+        .map-and-listing {
+            display: flex;
+            flex: 1;
+            margin-top: 80px;
+        }
+
+        .map-container {
+            width: 50%;
+            position: relative;
+        }
+
+        .listing-container {
+            width: 50%;
+            padding: 15px;
+            background-color: #fff;
+            box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+            height: calc(100vh - 80px);
+            overflow-y: auto;
+        }
+
+        /* Property Item */
+        .property-item {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .property-image {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .list-view .property-item {
+            display: flex;
+            align-items: center;
+        }
+
+        .list-view .property-image {
+            width: 120px;
+            height: 80px;
+            margin-right: 15px;
+            object-fit: cover;
+        }
+
+        .list-view .details {
+            flex: 1;
+            padding-left: 15px;
+        }
+
+        .price {
+            font-weight: bold;
+            color: #007bff;
+            margin-top: 5px;
+        }
+
+        .details p {
+            margin: 5px 0;
+        }
+
+        /* Grid and List Views */
+        .grid-view {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .list-view {
+            display: block;
+        }
+
+        /* Mapbox Popup */
+        .mapboxgl-popup {
+            max-width: 300px;
+        }
+
+        .mapboxgl-popup-content {
+            border-radius: 10px;
+        }
+
+        /* View Toggle Buttons */
+        .view-toggle {
+            margin: 10px 0;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .view-toggle button {
+            padding: 10px;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+
+        /* Hide Mobile Toggle Buttons on Desktop */
+        .mobile-toggle-buttons {
+            display: none;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 767px) {
+
+            /* Adjust Container */
+            .container {
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+
+            /* Hide View Toggle */
+            .view-toggle {
+                display: none;
+            }
+
+            /* Map and Listing Stack */
+            .map-and-listing {
+                flex-direction: column;
+                flex: 1;
+                margin-top: 80px;
+                overflow: hidden;
+            }
+
+            .map-container,
+            .listing-container {
+                width: 100%;
+                flex: 1;
+                display: none;
+                overflow-y: auto;
+            }
+
+            /* Show Listing by Default */
+            .listing-container {
+                display: block;
+            }
+
+            /* Adjust Heights */
+            .map-container,
+            .listing-container {
+                height: calc(100vh - 80px - 60px);
+            }
+
+            /* Mobile Toggle Buttons */
+            .mobile-toggle-buttons {
+                display: flex;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: #fff;
+                border-top: 1px solid #ccc;
+                z-index: 1000;
+            }
+
+            .mobile-toggle-buttons button {
+                flex: 1;
+                padding: 10px;
+                border: none;
+                background: none;
+                cursor: pointer;
+                font-size: 14px;
+            }
+
+            .mobile-toggle-buttons button.active {
+                background-color: #f0f0f0;
+            }
+
+            .mobile-toggle-buttons i {
+                display: block;
+                font-size: 20px;
+                margin-bottom: 3px;
+            }
+
+            .map-and-listing {
+                margin-bottom: 60px;
+            }
+
+            /* Search Container */
+            .search-container {
+                flex-wrap: wrap;
+                padding: 10px;
+            }
+
+            #geocoder {
+                flex: 1 1 100%;
+                margin-bottom: 10px;
+            }
+
+            .search-container select {
+                flex: 1 1 calc(50% - 10px);
+                margin-bottom: 10px;
+            }
+
+            /* Property Item */
+            .property-item {
+                padding: 10px;
+                margin-bottom: 15px;
+            }
+
+            .list-view .property-image {
+                width: 80px;
+                height: 60px;
+            }
+
+            .details p {
+                margin: 3px 0;
+                font-size: 14px;
+            }
+
+            .price {
+                font-size: 16px;
+            }
+
+            /* Grid View Adjustments */
+            .grid-view {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+
+            .grid-view .property-item {
+                padding: 10px;
+            }
+
+            .grid-view .property-image {
+                height: 100px;
+                object-fit: cover;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Search Container -->
+        <div class="search-container">
+            <div id="geocoder" style="display: inline-block;"></div>
+            <select id="filter-type" onchange="filterProperties()">
+                <option value="">All Types</option>
+                <option value="home">Home</option>
+                <option value="apartment">Apartment</option>
+                <option value="condo">Condo</option>
+                <option value="townhouse">Townhouse</option>
+            </select>
+            <select id="filter-bedrooms" onchange="filterProperties()">
+                <option value="">Bedrooms</option>
+                <option value="1">1+</option>
+                <option value="2">2+</option>
+                <option value="3">3+</option>
+                <option value="4">4+</option>
+            </select>
+            <select id="filter-bathrooms" onchange="filterProperties()">
+                <option value="">Bathrooms</option>
+                <option value="1">1+</option>
+                <option value="2">2+</option>
+                <option value="3">3+</option>
+                <option value="4">4+</option>
+            </select>
+            <select id="price-filter" onchange="filterProperties()">
+                <option value="">Price Range</option>
+                <option value="500000">$500K+</option>
+                <option value="1000000">$1M+</option>
+                <option value="2000000">$2M+</option>
+            </select>
+            <button onclick="resetFilters()">Reset Filters</button>
+        </div>
+
+        <!-- Map and Listing -->
+        <div class="map-and-listing">
+            <!-- Map Container -->
+            <div class="map-container" id="map"></div>
+
+            <!-- Listing Container -->
+            <div class="listing-container">
+                <h1 class="location-title">All Properties</h1>
+                <h4 class="property-count">0 properties available</h4>
+                <div class="view-toggle">
+                    <button id="grid-view-btn" onclick="toggleView('grid')">Grid View</button>
+                    <button id="list-view-btn" onclick="toggleView('list')">List View</button>
+                </div>
+                <div id="property-list" class="grid-view"></div>
+            </div>
+        </div>
+
+        <!-- Mobile Toggle Buttons (only visible on mobile devices) -->
+        <div class="mobile-toggle-buttons">
+            <button id="mobile-listing-btn" class="active">
+                <i class="fas fa-list"></i>
+                <span>Listings</span>
+            </button>
+            <button id="mobile-map-btn">
+                <i class="fas fa-map"></i>
+                <span>Map</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Mapbox JS -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.13.0/mapbox-gl.js"></script>
+
+    <!-- Mapbox Geocoder JS -->
+    <script
+        src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
+
+    <!-- Custom JS -->
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1Ijoid2Vid2l0aHJhaiIsImEiOiJjbTBhbGZmMHgxZXFuMm1vcWt4YmNwZGZhIn0.IpNziQwncy2U-Xms017ojA';
+
+        const properties = [
+            {
+                address: "215 Emily St, Mountain View, CA",
+                description: "Single family house with modern design",
+                price: 3889000,
+                type: "home",
+                bed: 5,
+                bath: 4.5,
+                size: 300,
+                position: [-122.28528451834352, 37.50024109655184],
+                image: "https://via.placeholder.com/400x300.png?text=Property+1"
+            },
+            {
+                address: "123 Main St, San Francisco, CA",
+                description: "Luxurious apartment in the heart of the city",
+                price: 1500000,
+                type: "apartment",
+                bed: 2,
+                bath: 2,
+                size: 1200,
+                position: [-122.4194, 37.7749],
+                image: "https://via.placeholder.com/400x300.png?text=Property+2"
+            },
+            {
+                address: "456 Maple Ave, Brooklyn, NY",
+                description: "Charming brownstone in Brooklyn",
+                price: 2800000,
+                type: "home",
+                bed: 4,
+                bath: 3,
+                size: 2500,
+                position: [-73.9542, 40.6782],
+                image: "https://via.placeholder.com/400x300.png?text=Property+3"
+            },
+            {
+                address: "789 Ocean Blvd, Miami, FL",
+                description: "Oceanfront condo with stunning views",
+                price: 2200000,
+                type: "condo",
+                bed: 3,
+                bath: 3,
+                size: 1500,
+                position: [-80.1349, 25.7617],
+                image: "https://via.placeholder.com/400x300.png?text=Property+4"
+            },
+            {
+                address: "321 Pine St, Seattle, WA",
+                description: "Modern loft in a vibrant neighborhood",
+                price: 950000,
+                type: "apartment",
+                bed: 1,
+                bath: 1,
+                size: 800,
+                position: [-122.3352, 47.6062],
+                image: "https://via.placeholder.com/400x300.png?text=Property+5"
+            },
+            {
+                address: "654 Oak Dr, Austin, TX",
+                description: "Stylish home with a large backyard",
+                price: 675000,
+                type: "home",
+                bed: 3,
+                bath: 2,
+                size: 1800,
+                position: [-97.7431, 30.2672],
+                image: "https://via.placeholder.com/400x300.png?text=Property+6"
+            },
+            {
+                address: "987 Willow St, Chicago, IL",
+                description: "Beautiful vintage apartment with high ceilings",
+                price: 1200000,
+                type: "apartment",
+                bed: 2,
+                bath: 2,
+                size: 1300,
+                position: [-87.6298, 41.8781],
+                image: "https://via.placeholder.com/400x300.png?text=Property+7"
+            },
+            {
+                address: "135 Sunset Blvd, Los Angeles, CA",
+                description: "Luxurious villa with a pool and views",
+                price: 4500000,
+                type: "home",
+                bed: 6,
+                bath: 5,
+                size: 4000,
+                position: [-118.4085, 34.0202],
+                image: "https://via.placeholder.com/400x300.png?text=Property+8"
+            },
+            {
+                address: "246 Elm St, Boston, MA",
+                description: "Cozy townhouse in a historic area",
+                price: 850000,
+                type: "townhouse",
+                bed: 3,
+                bath: 2,
+                size: 1600,
+                position: [-71.0589, 42.3601],
+                image: "https://via.placeholder.com/400x300.png?text=Property+9"
+            },
+            {
+                address: "369 River Rd, Denver, CO",
+                description: "Spacious home with mountain views",
+                price: 720000,
+                type: "home",
+                bed: 4,
+                bath: 3,
+                size: 2500,
+                position: [-104.9903, 39.7392],
+                image: "https://via.placeholder.com/400x300.png?text=Property+10"
+            },
+            {
+                address: "852 Park Ln, San Diego, CA",
+                description: "Beachside bungalow with private access",
+                price: 2300000,
+                type: "home",
+                bed: 3,
+                bath: 2,
+                size: 1200,
+                position: [-117.1611, 32.7157],
+                image: "https://via.placeholder.com/400x300.png?text=Property+11"
+            },
+            {
+                address: "147 Hill St, Nashville, TN",
+                description: "Charming cottage in a lively neighborhood",
+                price: 550000,
+                type: "home",
+                bed: 2,
+                bath: 1,
+                size: 1400,
+                position: [-86.7816, 36.1627],
+                image: "https://via.placeholder.com/400x300.png?text=Property+12"
+            },
+            {
+                address: "258 Spring St, Portland, OR",
+                description: "Modern condo in a bustling area",
+                price: 800000,
+                type: "condo",
+                bed: 1,
+                bath: 1,
+                size: 900,
+                position: [-122.6762, 45.5235],
+                image: "https://via.placeholder.com/400x300.png?text=Property+13"
+            },
+            {
+                address: "369 Cedar Ave, Salt Lake City, UT",
+                description: "Newly renovated home close to downtown",
+                price: 650000,
+                type: "home",
+                bed: 4,
+                bath: 2,
+                size: 2000,
+                position: [-111.8910, 40.7608],
+                image: "https://via.placeholder.com/400x300.png?text=Property+14"
+            },
+            {
+                address: "159 Birch St, Raleigh, NC",
+                description: "Modern apartment with great amenities",
+                price: 300000,
+                type: "apartment",
+                bed: 2,
+                bath: 2,
+                size: 1100,
+                position: [-78.6382, 35.7796],
+                image: "https://via.placeholder.com/400x300.png?text=Property+15"
+            },
+            {
+                address: "753 Prairie Rd, Minneapolis, MN",
+                description: "Spacious family home with a big yard",
+                price: 475000,
+                type: "home",
+                bed: 4,
+                bath: 3,
+                size: 2200,
+                position: [-93.2650, 44.9778],
+                image: "https://via.placeholder.com/400x300.png?text=Property+16"
+            },
+            {
+                address: "864 Valley Blvd, Las Vegas, NV",
+                description: "Luxurious condo with strip views",
+                price: 1750000,
+                type: "condo",
+                bed: 3,
+                bath: 3,
+                size: 1600,
+                position: [-115.1739, 36.1699],
+                image: "https://via.placeholder.com/400x300.png?text=Property+17"
+            },
+            {
+                address: "975 Greenway Dr, Phoenix, AZ",
+                description: "Charming home with a spacious patio",
+                price: 400000,
+                type: "home",
+                bed: 3,
+                bath: 2,
+                size: 1700,
+                position: [-112.0740, 33.4484],
+                image: "https://via.placeholder.com/400x300.png?text=Property+18"
+            },
+            {
+                address: "186 Blue Sky Ave, Atlanta, GA",
+                description: "Modern apartment in a prime location",
+                price: 620000,
+                type: "apartment",
+                bed: 2,
+                bath: 2,
+                size: 1400,
+                position: [-84.3879, 33.7485],
+                image: "https://via.placeholder.com/400x300.png?text=Property+19"
+            },
+            {
+                address: "293 Sunset Ct, Honolulu, HI",
+                description: "Ocean view home with tropical landscaping",
+                price: 3500000,
+                type: "home",
+                bed: 4,
+                bath: 3,
+                size: 2800,
+                position: [-157.8583, 21.3069],
+                image: "https://via.placeholder.com/400x300.png?text=Property+20"
+            }
+        ];
+
+        let searchedLocation = null; // Set to null to indicate no search has been performed
+        let shouldAdjustMap = true; // Flag to control map adjustment
+        // Variable to hold current filters
+        let currentFilters = {
+            type: '',
+            bedrooms: 0,
+            bathrooms: 0,
+            price: 0
+        };
+
+        var map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v11',
+            center: [-98.5795, 39.8283], // Center of the US
+            zoom: 3 // Zoomed out to show the entire US
+        });
+
+        // Initialize Geocoder (Search Bar) without creating new markers
+        var geocoder = new MapboxGeocoder({
+            accessToken: mapboxgl.accessToken,
+            mapboxgl: mapboxgl,
+            placeholder: 'Search by address',
+            proximity: {
+                longitude: -98.5795,
+                latitude: 39.8283
+            },
+            marker: false // Disable default marker creation
+        });
+        document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
+
+        // Update searched location when a new search is performed
+        geocoder.on('result', function (e) {
+            searchedLocation = e.result.geometry.coordinates;
+            map.flyTo({ center: searchedLocation, zoom: 10 }); // Adjust zoom level as needed
+            document.querySelector('.location-title').textContent = e.result.place_name; // Update location title
+            filterProperties(); // Apply filters based on the new location
+        });
+
+        let markers = []; // Array to hold marker instances
+
+        function toggleView(view) {
+            const propertyList = document.getElementById('property-list');
+            propertyList.className = view === 'grid' ? 'grid-view' : 'list-view';
+
+            // Update button styles
+            document.getElementById('grid-view-btn').classList.toggle('active', view === 'grid');
+            document.getElementById('list-view-btn').classList.toggle('active', view === 'list');
+        }
+
+        // Function to filter properties based on current filters and map bounds
+        function filterPropertiesByMapBounds() {
+            const bounds = map.getBounds();
+
+            const filteredProperties = properties.filter((property) => {
+                // Check if property is within map bounds
+                const isWithinBounds = bounds.contains([property.position[0], property.position[1]]);
+
+                // Apply other filters
+                const matchesFilters =
+                    (!currentFilters.type || property.type === currentFilters.type) &&
+                    (!currentFilters.bedrooms || property.bed >= currentFilters.bedrooms) &&
+                    (!currentFilters.bathrooms || property.bath >= currentFilters.bathrooms) &&
+                    (!currentFilters.price || property.price >= currentFilters.price);
+
+                return isWithinBounds && matchesFilters;
+            });
+
+            updatePropertyList(filteredProperties);
+            document.querySelector('.property-count').textContent = `${filteredProperties.length} properties available`; // Update property count
+        }
+
+        // Update filterProperties function to store current filters and call filterPropertiesByMapBounds
+        function filterProperties() {
+            currentFilters.type = document.getElementById('filter-type').value;
+            currentFilters.bedrooms = parseInt(document.getElementById('filter-bedrooms').value) || 0;
+            currentFilters.bathrooms = parseInt(document.getElementById('filter-bathrooms').value) || 0;
+            currentFilters.price = parseInt(document.getElementById('price-filter').value) || 0;
+
+            // Call filterPropertiesByMapBounds to apply filters based on current map bounds
+            filterPropertiesByMapBounds();
+        }
+
+        // Add event listener to map to update properties when map moves
+        map.on('moveend', () => {
+            filterPropertiesByMapBounds();
+        });
+
+        function updatePropertyList(propertiesToShow) {
+            const propertyList = document.getElementById('property-list');
+            propertyList.innerHTML = '';
+
+            // Clear existing markers from the map
+            markers.forEach((marker) => marker.remove());
+            markers = [];
+
+            if (propertiesToShow.length === 0) {
+                propertyList.innerHTML = '<p>No properties found based on the selected criteria.</p>';
+                return;
+            }
+
+            propertiesToShow.forEach((property) => {
+                // Create property item in the list
+                const propertyItem = document.createElement('div');
+                propertyItem.classList.add('property-item');
+                propertyItem.innerHTML = `
+                    <img src="${property.image}" alt="Property at ${property.address}" class="property-image" />
+                    <div class="details">
+                        <p>${property.address}</p>
+                        <p>${property.bed} Beds | ${property.bath} Baths | ${property.size} Sq.m</p>
+                        <p class="price">$${property.price.toLocaleString()}</p>
+                    </div>
+                `;
+                propertyList.appendChild(propertyItem);
+
+                // Add markers to the map for each property
+                const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+                    <h3>${property.address}</h3>
+                    <p>${property.bed} Beds, ${property.bath} Baths, ${property.size} Sq.m</p>
+                    <p class="price">$${property.price.toLocaleString()}</p>
+                `);
+
+                const marker = new mapboxgl.Marker()
+                    .setLngLat(property.position)
+                    .setPopup(popup)
+                    .addTo(map);
+
+                markers.push(marker);
+            });
+
+            // No need to adjust map bounds here, since we are filtering based on current map bounds
+        }
+
+        function resetFilters() {
+            document.getElementById('filter-type').value = '';
+            document.getElementById('filter-bedrooms').value = '';
+            document.getElementById('filter-bathrooms').value = '';
+            document.getElementById('price-filter').value = '';
+            filterProperties(); // Apply filters after resetting
+        }
+
+        // Initial listing of properties
+        filterProperties();
+
+        // Mobile toggle buttons functionality
+        document.getElementById('mobile-listing-btn').addEventListener('click', function () {
+            document.querySelector('.listing-container').style.display = 'block';
+            document.querySelector('.map-container').style.display = 'none';
+            this.classList.add('active');
+            document.getElementById('mobile-map-btn').classList.remove('active');
+        });
+
+        document.getElementById('mobile-map-btn').addEventListener('click', function () {
+            document.querySelector('.listing-container').style.display = 'none';
+            document.querySelector('.map-container').style.display = 'block';
+            this.classList.add('active');
+            document.getElementById('mobile-listing-btn').classList.remove('active');
+            map.resize(); // Ensure the map resizes correctly
+        });
+    </script>
+</body>
+
+</html>
