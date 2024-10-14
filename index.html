@@ -42,38 +42,40 @@
             left: 0;
             right: 0;
             background: white;
-            padding: 15px 20px;
+            padding: 10px 15px;
             z-index: 1000;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
             display: flex;
             align-items: center;
             flex-wrap: wrap;
         }
 
         #geocoder {
-            flex: 1 1 300px;
+            flex: 1 1 100%;
             min-width: 200px;
             margin-bottom: 10px;
         }
 
-        .search-container select {
+        .search-container select,
+        .search-container input[type="number"] {
             margin-right: 10px;
             margin-bottom: 10px;
-            padding: 10px;
+            padding: 8px;
             border: 1px solid #ccc;
             border-radius: 4px;
-            flex: 1 1 100px;
+            flex: 1 1 calc(25% - 20px);
             min-width: 100px;
         }
 
         .search-container button {
-            padding: 10px 15px;
+            padding: 8px 12px;
             margin-bottom: 10px;
             background-color: #007bff;
             border: none;
             color: white;
             border-radius: 4px;
             cursor: pointer;
+            flex: 1 1 100%;
         }
 
         .mapboxgl-ctrl-geocoder {
@@ -99,6 +101,7 @@
             display: flex;
             flex: 1;
             margin-top: 80px;
+            overflow: hidden;
         }
 
         .map-container {
@@ -123,6 +126,7 @@
             border-radius: 8px;
             background-color: #fff;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
         }
 
         .property-image {
@@ -186,7 +190,7 @@
         }
 
         .view-toggle button {
-            padding: 10px;
+            padding: 8px;
             margin-left: 10px;
             cursor: pointer;
         }
@@ -194,6 +198,11 @@
         /* Hide Mobile Toggle Buttons on Desktop */
         .mobile-toggle-buttons {
             display: none;
+        }
+
+        /* Highlight on hover */
+        .property-item:hover {
+            background-color: #f0f0f0;
         }
 
         /* Responsive Styles */
@@ -235,7 +244,7 @@
             /* Adjust Heights */
             .map-container,
             .listing-container {
-                height: calc(100vh - 80px - 60px);
+                height: calc(100vh - 140px);
             }
 
             /* Mobile Toggle Buttons */
@@ -284,9 +293,14 @@
                 margin-bottom: 10px;
             }
 
-            .search-container select {
+            .search-container select,
+            .search-container input[type="number"] {
                 flex: 1 1 calc(50% - 10px);
                 margin-bottom: 10px;
+            }
+
+            .search-container button {
+                flex: 1 1 100%;
             }
 
             /* Property Item */
@@ -352,12 +366,9 @@
                 <option value="3">3+</option>
                 <option value="4">4+</option>
             </select>
-            <select id="price-filter" onchange="filterProperties()">
-                <option value="">Price Range</option>
-                <option value="500000">$500K+</option>
-                <option value="1000000">$1M+</option>
-                <option value="2000000">$2M+</option>
-            </select>
+            <!-- Min and Max Price Inputs -->
+            <input type="number" id="min-price-filter" placeholder="Min Price" onchange="filterProperties()" />
+            <input type="number" id="max-price-filter" placeholder="Max Price" onchange="filterProperties()" />
             <button onclick="resetFilters()">Reset Filters</button>
         </div>
 
@@ -625,14 +636,16 @@
             }
         ];
 
+
         let searchedLocation = null; // Set to null to indicate no search has been performed
-        let shouldAdjustMap = true; // Flag to control map adjustment
+
         // Variable to hold current filters
         let currentFilters = {
             type: '',
             bedrooms: 0,
             bathrooms: 0,
-            price: 0
+            minPrice: 0,
+            maxPrice: Infinity
         };
 
         var map = new mapboxgl.Map({
@@ -658,9 +671,10 @@
         // Update searched location when a new search is performed
         geocoder.on('result', function (e) {
             searchedLocation = e.result.geometry.coordinates;
-            map.flyTo({ center: searchedLocation, zoom: 10 }); // Adjust zoom level as needed
+            map.flyTo({ center: searchedLocation, zoom: 8 }); // Adjust zoom level as needed
             document.querySelector('.location-title').textContent = e.result.place_name; // Update location title
             filterProperties(); // Apply filters based on the new location
+            updateURLParameters(); // Update URL
         });
 
         let markers = []; // Array to hold marker instances
@@ -674,8 +688,89 @@
             document.getElementById('list-view-btn').classList.toggle('active', view === 'list');
         }
 
+        // Function to update the URL parameters
+        function updateURLParameters() {
+            const params = new URLSearchParams();
+
+            // Search location
+            if (searchedLocation) {
+                params.set('search_location', encodeURIComponent(document.querySelector('.location-title').textContent));
+                params.set('lat', searchedLocation[1]); // Latitude
+                params.set('lng', searchedLocation[0]); // Longitude
+            }
+
+            // Filters
+            if (currentFilters.type) params.set('type', currentFilters.type);
+            if (currentFilters.bedrooms) params.set('bedrooms', currentFilters.bedrooms);
+            if (currentFilters.bathrooms) params.set('bathrooms', currentFilters.bathrooms);
+            if (currentFilters.minPrice && currentFilters.minPrice !== 0) params.set('min_price', currentFilters.minPrice);
+            if (currentFilters.maxPrice && currentFilters.maxPrice !== Infinity) params.set('max_price', currentFilters.maxPrice);
+
+            // Update the URL without reloading the page
+            const newURL = window.location.pathname + '?' + params.toString();
+            history.replaceState(null, '', newURL);
+        }
+
+        // Function to get URL parameters on page load
+        function getURLParameters() {
+            const params = new URLSearchParams(window.location.search);
+
+            // Search location
+            const lat = parseFloat(params.get('lat'));
+            const lng = parseFloat(params.get('lng'));
+            const searchLocation = decodeURIComponent(params.get('search_location') || '');
+
+            if (!isNaN(lat) && !isNaN(lng)) {
+                searchedLocation = [lng, lat];
+                map.setCenter(searchedLocation);
+                map.setZoom(10);
+                document.querySelector('.location-title').textContent = searchLocation || 'Search Location';
+            }
+
+            // Filters
+            currentFilters.type = params.get('type') || '';
+            currentFilters.bedrooms = parseInt(params.get('bedrooms')) || 0;
+            currentFilters.bathrooms = parseInt(params.get('bathrooms')) || 0;
+            currentFilters.minPrice = parseInt(params.get('min_price')) || 0;
+            currentFilters.maxPrice = parseInt(params.get('max_price')) || Infinity;
+
+            // Set the filter inputs
+            document.getElementById('filter-type').value = currentFilters.type;
+            document.getElementById('filter-bedrooms').value = currentFilters.bedrooms || '';
+            document.getElementById('filter-bathrooms').value = currentFilters.bathrooms || '';
+            document.getElementById('min-price-filter').value = currentFilters.minPrice || '';
+            document.getElementById('max-price-filter').value = (currentFilters.maxPrice !== Infinity) ? currentFilters.maxPrice : '';
+
+            // Apply filters
+            filterProperties();
+        }
+
+        // Update filterProperties function to store current filters and call filterPropertiesByMapBounds
+        function filterProperties() {
+            currentFilters.type = document.getElementById('filter-type').value;
+            currentFilters.bedrooms = parseInt(document.getElementById('filter-bedrooms').value) || 0;
+            currentFilters.bathrooms = parseInt(document.getElementById('filter-bathrooms').value) || 0;
+            currentFilters.minPrice = parseInt(document.getElementById('min-price-filter').value) || 0;
+            currentFilters.maxPrice = parseInt(document.getElementById('max-price-filter').value) || Infinity;
+
+            // Call filterPropertiesByMapBounds to apply filters based on current map bounds
+            filterPropertiesByMapBounds();
+
+            // Update the URL with the new filters
+            updateURLParameters();
+        }
+
+        // Debounce function to limit how often a function can fire
+        function debounce(func, wait) {
+            let timeout;
+            return function (...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
         // Function to filter properties based on current filters and map bounds
-        function filterPropertiesByMapBounds() {
+        const filterPropertiesByMapBounds = debounce(function () {
             const bounds = map.getBounds();
 
             const filteredProperties = properties.filter((property) => {
@@ -687,30 +782,18 @@
                     (!currentFilters.type || property.type === currentFilters.type) &&
                     (!currentFilters.bedrooms || property.bed >= currentFilters.bedrooms) &&
                     (!currentFilters.bathrooms || property.bath >= currentFilters.bathrooms) &&
-                    (!currentFilters.price || property.price >= currentFilters.price);
+                    (property.price >= currentFilters.minPrice) &&
+                    (property.price <= currentFilters.maxPrice);
 
                 return isWithinBounds && matchesFilters;
             });
 
             updatePropertyList(filteredProperties);
             document.querySelector('.property-count').textContent = `${filteredProperties.length} properties available`; // Update property count
-        }
-
-        // Update filterProperties function to store current filters and call filterPropertiesByMapBounds
-        function filterProperties() {
-            currentFilters.type = document.getElementById('filter-type').value;
-            currentFilters.bedrooms = parseInt(document.getElementById('filter-bedrooms').value) || 0;
-            currentFilters.bathrooms = parseInt(document.getElementById('filter-bathrooms').value) || 0;
-            currentFilters.price = parseInt(document.getElementById('price-filter').value) || 0;
-
-            // Call filterPropertiesByMapBounds to apply filters based on current map bounds
-            filterPropertiesByMapBounds();
-        }
+        }, 200); // Adjust the debounce delay as needed
 
         // Add event listener to map to update properties when map moves
-        map.on('moveend', () => {
-            filterPropertiesByMapBounds();
-        });
+        map.on('moveend', filterPropertiesByMapBounds);
 
         function updatePropertyList(propertiesToShow) {
             const propertyList = document.getElementById('property-list');
@@ -752,6 +835,19 @@
                     .addTo(map);
 
                 markers.push(marker);
+
+                // Add hover event listeners to the property item
+                propertyItem.addEventListener('mouseover', () => {
+                    // Fly to the property's location
+                    // map.flyTo({ center: property.position, zoom: 14 });
+                    // Open the popup
+                    marker.getPopup().addTo(map);
+                });
+
+                propertyItem.addEventListener('mouseout', () => {
+                    // Close the popup
+                    marker.getPopup().remove();
+                });
             });
 
             // No need to adjust map bounds here, since we are filtering based on current map bounds
@@ -761,12 +857,15 @@
             document.getElementById('filter-type').value = '';
             document.getElementById('filter-bedrooms').value = '';
             document.getElementById('filter-bathrooms').value = '';
-            document.getElementById('price-filter').value = '';
+            document.getElementById('min-price-filter').value = '';
+            document.getElementById('max-price-filter').value = '';
             filterProperties(); // Apply filters after resetting
         }
 
-        // Initial listing of properties
-        filterProperties();
+        // Call getURLParameters() when the page loads
+        window.onload = function () {
+            getURLParameters();
+        };
 
         // Mobile toggle buttons functionality
         document.getElementById('mobile-listing-btn').addEventListener('click', function () {
