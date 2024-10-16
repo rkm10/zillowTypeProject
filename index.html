@@ -530,8 +530,9 @@
         ];
         
         let searchedLocation = null; // Set to null to indicate no search has been performed
-        let shouldAdjustMap = true; // Flag to control map adjustment
-// Variable to hold current filters
+        let markers = []; // Array to hold marker instances
+        
+        // Variable to hold current filters
         let currentFilters = {
             type: '',
             bedrooms: 0,
@@ -732,8 +733,8 @@
                 return;
             }
 
-            propertiesToShow.forEach((property, index) => {
-                // Create property item in the list
+            propertiesToShow.forEach((property) => {
+                // Creating property item in the list
                 const propertyItem = document.createElement('div');
                 propertyItem.classList.add('property-item');
                 propertyItem.innerHTML = `
@@ -762,8 +763,6 @@
 
                 // Add hover event listeners to the property item
                 propertyItem.addEventListener('mouseover', () => {
-                    // Fly to the property's location
-                    map.flyTo({ center: property.position, zoom: 14 });
                     // Open the popup
                     marker.getPopup().addTo(map);
                 });
